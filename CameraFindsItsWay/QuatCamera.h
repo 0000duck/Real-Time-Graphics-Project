@@ -46,6 +46,7 @@ public:
 	void Move(glm::vec3 direction, float deltaTime);
 	void Rotate(glm::mat4 rot);
 	void Rotate(glm::quat q);
+	glm::vec3 GetFront();
 
 private:
 	void updateCameraVectors();

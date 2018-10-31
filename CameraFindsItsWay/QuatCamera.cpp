@@ -50,6 +50,13 @@ void QuatCamera::Rotate(glm::quat q)
 	Orientation = q;
 }
 
+glm::vec3 QuatCamera::GetFront()
+{
+	glm::quat qF = Orientation * glm::quat(0, 0, 0, -1) * glm::conjugate(Orientation);
+	glm::vec3 Front = { qF.x, qF.y, qF.z };
+	return Front;
+}
+
 void QuatCamera::ProcessKeyboard(Camera_Movement direction, float deltaTime)
 {
 	float velocity = MovementSpeed * deltaTime;
