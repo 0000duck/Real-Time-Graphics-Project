@@ -7,6 +7,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include "stb_image.h"
 
 #include "Shader.h"
 #include "Mesh.h"
@@ -17,10 +18,14 @@
 #include <iostream>
 #include <vector>
 
+using namespace std;
+
 class Model
 {
 public:
-	Model(char* path)
+	vector<Texture> textures_loaded;
+
+	Model(const char* path)
 	{
 		loadModel(path);
 	}

@@ -3,13 +3,13 @@
 #include "Shader.h"
 #include "QuatCamera.h"
 #include "stb_image.h"
+#include "Model.h"
 
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
 #include <iostream>
-#include <filesystem>
 #include <iterator>
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -69,6 +69,7 @@ int main()
 
 	Shader lampShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.vertex", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.frag");
 	Shader lightingShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/colors.vertex", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/colors.frag");
+	Shader modelShader("model.vs", "model.fs");
 
 	float vertices[] = {
 		// positions          // normals           // texture coords
@@ -204,6 +205,9 @@ int main()
 	float dist = 0.0f;
 	int currentSegment = 0;
 
+	string path = "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/nanosuit/nanosuit.obj";
+	Model ourModel(path.c_str());
+
 	while (!glfwWindowShouldClose(window))
 	{
 		float currentFrame = glfwGetTime();
@@ -336,6 +340,11 @@ int main()
 		//	ourShader.setMat4("model", model);
 		//	glDrawArrays(GL_TRIANGLES, 0, 36);
 		//}
+
+		model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f)); // translate it down so it's at the center of the scene
+		model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));	// it's a bit too big for our scene, so scale it down
+		ourModel.Draw(modelShader);
+
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
