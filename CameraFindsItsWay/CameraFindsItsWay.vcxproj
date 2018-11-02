@@ -123,6 +123,7 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Documents\CppLibs\OpenGL\glad\src\glad.c" />
     <ClCompile Include="ImageLoader.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
     <ClCompile Include="Renderer.cpp" />
