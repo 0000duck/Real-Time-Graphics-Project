@@ -16,6 +16,7 @@ uniform sampler2D shadowMap;
 
 uniform vec3 lightPos;
 uniform vec3 viewPos;
+uniform vec3 bumpFactor;
 
 float ShadowCalculation(vec4 fragPosLightSpace)
 {  
@@ -25,6 +26,7 @@ float ShadowCalculation(vec4 fragPosLightSpace)
     float currentDepth = projCoords.z;
 
     vec3 normal = texture(normalMap, fs_in.TexCoords).rgb;
+    normal = normal * bumpFactor;
     vec3 lightDir = normalize(lightPos - fs_in.TangentFragPos);
     float bias = max(0.05 * (1.0 - dot(normal, lightDir)), 0.005);
 

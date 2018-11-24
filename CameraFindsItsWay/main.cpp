@@ -24,7 +24,7 @@ void renderScene(const Shader &shader);
 void renderCube();
 void renderQuad();
 void calculateTangents(float vertexArray[], int stride, glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, glm::vec2  uv1, glm::vec2 uv2, glm::vec2 uv3, glm::vec2 uv4, glm::vec3 nm);
-
+void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, glm::vec2 uv4, glm::vec3 nm);
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
@@ -42,12 +42,12 @@ bool autoCamera = false;
 float totalLength = 0;
 float segmentLength[10];
 
-// plane
-unsigned int planeVAO;
-
 glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 glm::mat4 lightRotationMat;
 float lightRotation;
+
+// normal map
+glm::vec3 bumpFactor = glm::vec3(1.0f);
 
 int main()
 {
@@ -89,37 +89,10 @@ int main()
 
 	Shader modelShader("model.vs", "model.fs");
 
-	// plane stuff
-
-	float planeVertices[] = {
-		// positions            // normals         // texcoords
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,   0.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-
-		 25.0f, -0.5f,  25.0f,  0.0f, 1.0f, 0.0f,  25.0f,  0.0f,
-		-25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,   0.0f, 25.0f,
-		 25.0f, -0.5f, -25.0f,  0.0f, 1.0f, 0.0f,  25.0f, 10.0f
-	};
-
-	unsigned int planeVBO;
-	glGenVertexArrays(1, &planeVAO);
-	glGenBuffers(1, &planeVBO);
-	glBindVertexArray(planeVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(planeVertices), planeVertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
-	glEnableVertexAttribArray(1);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(2);
-	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
-	glBindVertexArray(0);
-
 	//unsigned int cubeTexture = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/brickwall.jpg");
 	//unsigned int normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/brickwall_normal.jpg");
 
-	unsigned int cubeTexture = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/awesomeface.png");
+	unsigned int diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/Wood_Floor_007_COLOR.jpg");
 	unsigned int normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/normal_4.png");
 
 	glm::vec3 pathPoints[] = {
@@ -174,9 +147,9 @@ int main()
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	
 	normalShader.use();
-	shader.setInt("diffuseMap", 0);
-	shader.setInt("normalMap", 1);
-	shader.setInt("shadowMap", 2);
+	normalShader.setInt("diffuseMap", 0);
+	normalShader.setInt("normalMap", 1);
+	normalShader.setInt("shadowMap", 2);
 	debugShader.use();
 	debugShader.setInt("depthMap0", 0);
 	
@@ -191,7 +164,7 @@ int main()
 	float dist = 0.0f;
 	int currentSegment = 0;
 
-	Model carModel("testarossa/testarossa3.obj");
+	//Model carModel("testarossa/testarossa3.obj");
 
 	while (!glfwWindowShouldClose(window))
 	{
@@ -242,13 +215,20 @@ int main()
 		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
 		glClear(GL_DEPTH_BUFFER_BIT);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, cubeTexture);
+		glBindTexture(GL_TEXTURE_2D, diffuseMap);
 		renderScene(shadowMapShader);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		normalShader.use();
+
+		normalShader.setVec3("bumpFactor", bumpFactor);
+
+		//normalShader.setInt("diffuseMap", 0);
+		//normalShader.setInt("normalMap", 1);
+		//normalShader.setInt("shadowMap", 2);
+
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 		glm::mat4 view = camera.GetViewMatrix();
 		normalShader.setMat4("projection", projection);
@@ -258,7 +238,7 @@ int main()
 		normalShader.setVec3("lightPos", lightPosRotated);
 		normalShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, cubeTexture);
+		glBindTexture(GL_TEXTURE_2D, diffuseMap);
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, normalMap);
 		glActiveTexture(GL_TEXTURE2);
@@ -266,44 +246,21 @@ int main()
 		renderScene(normalShader);
 
 
-		modelShader.use();
-		modelShader.setMat4("projection", projection);
-		modelShader.setMat4("view", view);
+		//modelShader.use();
+		//modelShader.setMat4("projection", projection);
+		//modelShader.setMat4("view", view);
 
 		glm::mat4 model;
 		model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
-		modelShader.setMat4("model", model);
-		carModel.Draw(modelShader);
-
-		// normals stuff
-		normalShader.use();
-		normalShader.setInt("diffuseMap", 0);
-		normalShader.setInt("normalMap", 1);
-		normalShader.setInt("shadowMap", 2);
-		normalShader.setMat4("projection", projection);
-		normalShader.setMat4("view", view);
-
-		model = glm::translate(model, glm::vec3(0, 0, 2));
-		//model = glm::rotate(model, glm::radians((float)glfwGetTime() * -10.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
-
-		normalShader.setMat4("model", model);
-		normalShader.setVec3("viewPos", camera.Position);
-		normalShader.setVec3("lightPos", lightPosRotated);
-		normalShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, cubeTexture);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, normalMap);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, depthMap);
-		renderQuad(); 
+		//modelShader.setMat4("model", model);
+		//carModel.Draw(modelShader);
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();
 	}
 
-	glDeleteVertexArrays(1, &planeVAO);
-	glDeleteBuffers(1, &planeVBO);
+	//glDeleteVertexArrays(1, &planeVAO);
+	//glDeleteBuffers(1, &planeVBO);
 
 	glfwTerminate();
 	return 0;
@@ -473,13 +430,26 @@ unsigned int loadTexture(char const* path)
 	return textureID;
 }
 
+
+//// positions            // normals         // texcoords
+//25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
+//-25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
+//-25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
+//
+//25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
+//-25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
+//25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 10.0f
+
 void renderScene(const Shader &shader)
 {
 	// floor
 	glm::mat4 model;
 	shader.setMat4("model", model);
-	glBindVertexArray(planeVAO);
-	glDrawArrays(GL_TRIANGLES, 0, 6);
+	//glBindVertexArray(planeVAO);
+	//glDrawArrays(GL_TRIANGLES, 0, 6);
+
+	renderQuad(glm::vec3(-25.0f, -0.5, -25.0f), glm::vec3(-25.0f, -0.5, 25.0f), glm::vec3(25.0f, -0.5f, 25.0f), glm::vec3(25.0f, -0.5, -25.0f), glm::vec2(0.0f, 25.0f), glm::vec2(0.0f, 0.0f), glm::vec2(25.0f, 0.0f), glm::vec2(25.0f, 25.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
 	// cubes
 	model = glm::mat4();
 	model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
@@ -717,6 +687,39 @@ unsigned int quadVBO;
 //	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 //	glBindVertexArray(0);
 //}
+
+unsigned int planeVAO = 0;
+unsigned int planeVBO = 0;
+
+void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, glm::vec2 uv4, glm::vec3 nm)
+{
+	if (planeVAO == 0)
+	{
+		float vertices[84];
+		calculateTangents(vertices, 0, pos1, pos2, pos3, pos4, uv1, uv2, uv3, uv4, nm);
+		glGenVertexArrays(1, &planeVAO);
+		glGenBuffers(1, &planeVBO);
+		// fill buffer
+		glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+		// link vertex attributes
+		glBindVertexArray(planeVAO);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+		glEnableVertexAttribArray(3);
+		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+		glEnableVertexAttribArray(4);
+		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+	}
+	// render plane
+	glBindVertexArray(planeVAO);
+	glDrawArrays(GL_TRIANGLES, 0, 6);
+	glBindVertexArray(0);
+}
 
 void renderQuad()
 {
