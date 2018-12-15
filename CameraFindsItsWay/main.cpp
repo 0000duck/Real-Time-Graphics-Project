@@ -47,7 +47,7 @@ glm::mat4 lightRotationMat;
 float lightRotation;
 
 // normal map
-glm::vec3 bumpFactor = glm::vec3(1.0f);
+float bumpFactor = 1.0f;
 
 int main()
 {
@@ -76,6 +76,7 @@ int main()
 		return -1;
 	}
 
+	glEnable(GL_MULTISAMPLE);
 	glEnable(GL_DEPTH_TEST);
 
 	//Shader lampShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.vertex", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.frag");
@@ -89,10 +90,7 @@ int main()
 
 	Shader modelShader("model.vs", "model.fs");
 
-	//unsigned int cubeTexture = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/brickwall.jpg");
-	//unsigned int normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/brickwall_normal.jpg");
-
-	unsigned int diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/Wood_Floor_007_COLOR.jpg");
+	unsigned int diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/legoImages/Blocks_001_COLOR_A.jpg");
 	unsigned int normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/normal_4.png");
 
 	glm::vec3 pathPoints[] = {
@@ -145,7 +143,7 @@ int main()
 	glDrawBuffer(GL_NONE);
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	
+
 	normalShader.use();
 	normalShader.setInt("diffuseMap", 0);
 	normalShader.setInt("normalMap", 1);
@@ -217,13 +215,13 @@ int main()
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, diffuseMap);
 		renderScene(shadowMapShader);
+		
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		normalShader.use();
 
-		normalShader.setVec3("bumpFactor", bumpFactor);
+		normalShader.setFloat("bumpFactor", bumpFactor);
 
 		//normalShader.setInt("diffuseMap", 0);
 		//normalShader.setInt("normalMap", 1);
@@ -298,6 +296,11 @@ void processInput(GLFWwindow *window)
 		camera.ProcessKeyboard(Camera_Movement::LEFT, deltaTime);
 	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
 		camera.ProcessKeyboard(Camera_Movement::RIGHT, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_B) == GLFW_PRESS)
+	{
+		bumpFactor -= 0.1f * deltaTime;
+		cout << "Bumpy: " << bumpFactor << endl;
+	}
 }
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
@@ -430,23 +433,11 @@ unsigned int loadTexture(char const* path)
 	return textureID;
 }
 
-
-//// positions            // normals         // texcoords
-//25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
-//-25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f,
-//-25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
-//
-//25.0f, -0.5f, 25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 0.0f,
-//-25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 0.0f, 25.0f,
-//25.0f, -0.5f, -25.0f, 0.0f, 1.0f, 0.0f, 25.0f, 10.0f
-
 void renderScene(const Shader &shader)
 {
 	// floor
 	glm::mat4 model;
 	shader.setMat4("model", model);
-	//glBindVertexArray(planeVAO);
-	//glDrawArrays(GL_TRIANGLES, 0, 6);
 
 	renderQuad(glm::vec3(-25.0f, -0.5, -25.0f), glm::vec3(-25.0f, -0.5, 25.0f), glm::vec3(25.0f, -0.5f, 25.0f), glm::vec3(25.0f, -0.5, -25.0f), glm::vec2(0.0f, 25.0f), glm::vec2(0.0f, 0.0f), glm::vec2(25.0f, 0.0f), glm::vec2(25.0f, 25.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
