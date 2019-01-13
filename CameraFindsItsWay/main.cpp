@@ -19,6 +19,7 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
 glm::vec3 CatmullRom(float t, glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3);
 float computeSplineLength(glm::vec3 point0, glm::vec3 point1, glm::vec3 point2, glm::vec3 point3);
 glm::quat Squad(glm::quat q0, glm::quat q1, glm::quat q2, glm::quat q4, float t);
@@ -56,6 +57,9 @@ const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
 
 // normal map
 float bumpFactor = 1.0f;
+
+// i hate you kdtree
+KDNode* kdnode;
 
 // ugly stuff
 
@@ -147,6 +151,7 @@ int initWindow(int multisampling)
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 	glfwSetCursorPosCallback(window, mouse_callback);
 	glfwSetScrollCallback(window, scroll_callback);
+	glfwSetMouseButtonCallback(window, mouse_button_callback);
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
 	{
@@ -262,7 +267,7 @@ int initWindow(int multisampling)
 int main()
 {
 	vector<Triangle*> tris = setupTriangles();
-	KDNode* kdnode = new KDNode();
+	kdnode = new KDNode();
 	kdnode = kdnode->build(tris, 0);
 
 	vector<BoundingBox> bboxes = vector<BoundingBox>();
@@ -530,6 +535,25 @@ float computeSplineLength(glm::vec3 point0, glm::vec3 point1, glm::vec3 point2, 
 	}
 
 	return totalLength;
+}
+
+void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
+{
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+	{
+		glm::vec3 intersection;
+		float t = 0;
+		float tmin = 1;
+		if (kdnode->hit(kdnode, Ray(camera.Position, camera.GetFront()), t, tmin, intersection))
+		{
+			cout << "Hit a tri in: " << intersection.x << " " << intersection.y << " " << intersection.z << endl;
+		}
+		else
+		{
+			cout << "Fuuuuck!" << endl;
+		}
+
+	}
 }
 
 void mouse_callback(GLFWwindow* window, double xpos, double ypos)

@@ -125,6 +125,7 @@
     <ClCompile Include="ImageLoader.cpp" />
     <ClCompile Include="KDTree\BoundingBox.cpp" />
     <ClCompile Include="KDTree\KDNode.cpp" />
+    <ClCompile Include="KDTree\Ray.cpp" />
     <ClCompile Include="KDTree\Triangle.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
@@ -138,6 +139,7 @@
     <ClInclude Include="Camera.h" />
     <ClInclude Include="KDTree\BoundingBox.h" />
     <ClInclude Include="KDTree\KDNode.h" />
+    <ClInclude Include="KDTree\Ray.h" />
     <ClInclude Include="KDTree\Triangle.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />

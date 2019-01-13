@@ -169,3 +169,38 @@ void KDNode::getAllBoundingBoxes(std::vector<BoundingBox>& bboxes)
 		right->getAllBoundingBoxes(bboxes);
 	}
 }
+
+bool KDNode::hit(KDNode* node, const Ray& ray, float& t, float& tmin, glm::vec3& intersectionPoint) const
+{
+	if (node->bbox.intersect(ray))
+	{
+		//Normal normal;
+		bool hitTri = false;
+		glm::vec3 hitPt, localHitPt;
+		if (node->left->triangles.size() > 0 || node->right->triangles.size() > 0)
+		{
+			bool hitleft = hit(node->left, ray, t, tmin, intersectionPoint);
+			bool hitright = hit(node->right, ray, t, tmin, intersectionPoint);
+			return hitleft || hitright;
+		}
+		else
+		{
+			// reached a leaf
+			for (int i = 0; i < node->triangles.size(); i++)
+			{
+				if (node->triangles[i]->intersect(ray, triangles[i], intersectionPoint))
+				{
+					hitTri = true;
+					tmin = t;
+				}
+			}
+			if (hitTri)
+			{
+				// shader stuff
+				return true;
+			}
+		}
+		return false;
+	}
+	return false;
+}

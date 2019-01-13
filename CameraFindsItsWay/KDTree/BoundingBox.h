@@ -1,6 +1,7 @@
 #pragma once
 #include "../glm/glm.hpp"
 #include <algorithm>
+#include "Ray.h"
 //#include "glm/gtc/type_ptr.hpp"
 
 class BoundingBox
@@ -14,6 +15,7 @@ public:
 	float getZExpansion();
 
 	BoundingBox(glm::vec3 a, glm::vec3 b, glm::vec3 c);
+	bool intersect(const Ray& r);
 	BoundingBox() {};
 private:
 	glm::vec3 pivot;

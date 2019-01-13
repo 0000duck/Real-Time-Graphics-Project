@@ -4,6 +4,7 @@
 #include <string>
 #include "BoundingBox.h"
 #include "Triangle.h"
+#include "Ray.h"
 
 class KDNode
 {
@@ -18,5 +19,5 @@ public:
 	KDNode* build(std::vector<Triangle*>& tris, int depth) const;
 	std::string traverse();
 	void getAllBoundingBoxes(std::vector<BoundingBox>& bboxes);
-	bool hit();
+	bool hit(KDNode* node, const Ray& ray, float&, float& tmin, glm::vec3& intersectionPoint) const;
 };

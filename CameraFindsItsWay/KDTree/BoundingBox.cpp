@@ -1,5 +1,6 @@
 #include "BoundingBox.h"
 #include <iostream>
+#include "Ray.h"
 
 
 void BoundingBox::expand(BoundingBox otherBox)
@@ -125,4 +126,56 @@ BoundingBox::BoundingBox(glm::vec3 a, glm::vec3 b, glm::vec3 c)
 	this->width = orderedX[2] - orderedX[0];
 	this->height = orderedY[2] - orderedY[0];
 	this->depth = orderedZ[2] - orderedZ[0];
+}
+
+bool BoundingBox::intersect(const Ray &r)
+{
+
+	float
+		min_x, max_x,
+		min_y, max_y,
+		min_z, max_z;
+
+	min_x = pivot.x;
+	min_y = pivot.y;
+	min_z = pivot.z;
+
+	max_x = getXExpansion();
+	max_y = getYExpansion();
+	max_z = getZExpansion();
+
+	float tmin = (min_x - r.origin.x) / r.direction.x;
+	float tmax = (max_x - r.origin.x) / r.direction.x;
+
+	if (tmin > tmax) std::swap(tmin, tmax);
+
+	float tymin = (min_y - r.origin.y) / r.direction.y;
+	float tymax = (max_y - r.origin.y) / r.direction.y;
+
+	if (tymin > tymax) std::swap(tymin, tymax);
+
+	if ((tmin > tymax) || (tymin > tmax))
+		return false;
+
+	if (tymin > tmin)
+		tmin = tymin;
+
+	if (tymax < tmax)
+		tmax = tymax;
+
+	float tzmin = (min_z - r.origin.z) / r.direction.z;
+	float tzmax = (max_z - r.origin.z) / r.direction.z;
+
+	if (tzmin > tzmax) std::swap(tzmin, tzmax);
+
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return false;
+
+	if (tzmin > tmin)
+		tmin = tzmin;
+
+	if (tzmax < tmax)
+		tmax = tzmax;
+
+	return true;
 }
