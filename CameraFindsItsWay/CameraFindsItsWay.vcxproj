@@ -123,6 +123,9 @@
   <ItemGroup>
     <ClCompile Include="..\..\..\..\Documents\CppLibs\OpenGL\glad\src\glad.c" />
     <ClCompile Include="ImageLoader.cpp" />
+    <ClCompile Include="KDTree\BoundingBox.cpp" />
+    <ClCompile Include="KDTree\KDNode.cpp" />
+    <ClCompile Include="KDTree\Triangle.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Model.cpp" />
@@ -133,6 +136,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="KDTree\BoundingBox.h" />
+    <ClInclude Include="KDTree\KDNode.h" />
+    <ClInclude Include="KDTree\Triangle.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="Renderer.h" />

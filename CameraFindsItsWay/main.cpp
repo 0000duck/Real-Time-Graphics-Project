@@ -8,10 +8,13 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
+#include "KDTree/KDNode.h"
 
 #include <iostream>
 #include <iterator>
 
+void draw_bbox(BoundingBox &bbox, const Shader &shader);
+vector<Triangle*> setupTriangles();
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
@@ -71,6 +74,8 @@ glm::vec3 pathPoints[] = {
 	glm::vec3(2.1f, 4.7f, -5.5f)
 };
 
+
+// rotation thing
 glm::quat quats[] = {
 	glm::angleAxis(0.0f, glm::vec3(0.0, 1.0, 0.0)),
 	glm::angleAxis(5.0f, glm::vec3(0.0, 1.0, 0.0)),
@@ -105,7 +110,8 @@ Shader shadowMapShader;
 Shader debugShader;
 Shader shader;
 Shader normalShader;
-Shader modelShader;
+
+Shader wireShader;
 
 int currentSampleRate = 0;
 
@@ -153,14 +159,12 @@ int initWindow(int multisampling)
 
 	carModel = Model("testarossa/testarossa3.obj");
 
-	modelShader = Shader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.vs", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.fs");
-
 	shadowMapShader = Shader("shadowMapping.vs", "shadowMapping.fs");
-	//Shader debugShader("debugQuad.vs", "debugQuad.fs");
 	shader = Shader("Shadow_Mapping_Shader.vs", "Shadow_Mapping_Shader.fs");
 	normalShader = Shader("normalShader.vs", "normalShader.fs");
+	wireShader = Shader("wireShader.vs", "wireShader.fs");
 
-	//Shader modelShader("model.vs", "model.fs");
+
 
 	diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/unicorn.jpg");
 	normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/normal_4.png");
@@ -215,8 +219,8 @@ int initWindow(int multisampling)
 	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
 	glEnableVertexAttribArray(4);
 	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-
 	// cubeend
+	
 	// plane
 
 	float vertices[84];
@@ -238,15 +242,12 @@ int initWindow(int multisampling)
 	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
 	glEnableVertexAttribArray(4);
 	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
-
 	// plane end
 
 	normalShader.use();
 	normalShader.setInt("diffuseMap", 0);
 	normalShader.setInt("normalMap", 1);
 	normalShader.setInt("shadowMap", 2);
-	//debugShader.use();
-	//debugShader.setInt("depthMap0", 0);
 
 	for (int i = 1; i < 10; i++)
 	{
@@ -260,6 +261,19 @@ int initWindow(int multisampling)
 
 int main()
 {
+	vector<Triangle*> tris = setupTriangles();
+	KDNode* kdnode = new KDNode();
+	kdnode = kdnode->build(tris, 0);
+
+	vector<BoundingBox> bboxes = vector<BoundingBox>();
+	kdnode->getAllBoundingBoxes(bboxes);
+
+	//for (int i = 0; i < bboxes.size(); i++)
+	//{
+	//	cout << "BoundingBox X: " << bboxes[i].getPivot().x << " Y: " << bboxes[i].getPivot().y << " Z: " << bboxes[i].getPivot().y <<
+	//		" Expansions X: " << bboxes[i].getXExpansion() << " Y: " << bboxes[i].getXExpansion() << " Z: " << bboxes[i].getXExpansion() << endl;
+	//}
+
 	while (game_is_running)
 	{
 		initWindow(currentSampleRate);
@@ -317,8 +331,9 @@ int main()
 			glm::mat4 model;
 			model = glm::translate(model, glm::vec3(0.0f, -0.5f, -0.75f));
 			shadowMapShader.setMat4("model", model);
-			carModel.Draw(shadowMapShader);
+			//carModel.Draw(shadowMapShader);
 
+			draw_bbox(kdnode->bbox, wireShader);
 
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
 			glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
@@ -351,9 +366,18 @@ int main()
 			normalShader.setMat4("projection", projection);
 			normalShader.setMat4("view", view);
 
+			//glm::mat4 model;
+			wireShader.use();
+			wireShader.setMat4("projection", projection);
+			wireShader.setMat4("view", view);
+			for (int i = 0; i < bboxes.size(); i++)
+			{
+				draw_bbox(bboxes[i], wireShader);
+			}
+
 			//model = glm::translate(model, glm::vec3(0.0f, -0.5f, -0.75f));
-			normalShader.setMat4("model", model);
-			carModel.Draw(normalShader);
+			//normalShader.setMat4("model", model);
+			//carModel.Draw(normalShader);
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
@@ -600,15 +624,6 @@ void renderScene(const Shader &shader)
 	glm::vec3(2.0f,  4.0f, -5.0f),
 	glm::vec3(-1.5f, -2.2f, -2.5f),
 	};
-
-	//for (unsigned int i = 0; i < 3; i++)
-	//{
-	//	model = glm::translate(model, cubePositions[i]);
-	//	float angle = 20.0f * i;
-	//	model = glm::rotate(model, glm::radians(angle), glm::vec3(1.0f, 0.3f, 0.5f));
-	//	shader.setMat4("model", model);
-	//	renderCube();
-	//}
 }
 
 void renderCube()
@@ -785,32 +800,65 @@ void calculateTangents(float vertexArray[], int stride, glm::vec3 pos1, glm::vec
 	vertexArray[stride + 83] = bitangent2.z;
 }
 
-//void renderQuad()
-//{
-//	if (quadVAO == 0)
-//	{
-//		float quadVertices[] = {
-//			// positions        // texture Coords
-//			-1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-//			-1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-//			 1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-//			 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-//		};
-//		// setup plane VAO
-//		glGenVertexArrays(1, &quadVAO);
-//		glGenBuffers(1, &quadVBO);
-//		glBindVertexArray(quadVAO);
-//		glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-//		glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-//		glEnableVertexAttribArray(0);
-//		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-//		glEnableVertexAttribArray(1);
-//		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-//	}
-//	glBindVertexArray(quadVAO);
-//	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-//	glBindVertexArray(0);
-//}
+vector<Triangle*> setupTriangles()
+{
+	//triangle shit
+	glm::vec3 triTemp[36]{
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, 1.0f, 1.0f),
+	glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, -1.0f),
+	glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
+	glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f),
+	glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, -1.0f)
+	};
+
+	glm::mat4 model;
+
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
+	model = glm::scale(model, glm::vec3(0.5f));
+	for (int i = 0; i < 12; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(2.0f, 2.0f, -5.0));
+	model = glm::scale(model, glm::vec3(0.5f));
+	for (int i = 12; i < 24; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(-1.5f, 2.2f, -2.5f));
+	model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+	model = glm::scale(model, glm::vec3(0.5));
+	for (int i = 24; i < 36; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	for (int i = 0; i < 36; i++)
+	{
+		cout << "Point X: " << triTemp[i].x << " Y: " << triTemp[i].y << " Z: " << triTemp[i].z << std::endl;
+	}
+
+	std::vector<Triangle*> tris = vector<Triangle*>();
+	for (int i = 0; i < 36; i+=3)
+	{
+		tris.push_back(new Triangle(triTemp[i], triTemp[i + 1], triTemp[i + 2]));
+	}
+
+	return tris;
+}
 
 void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, glm::vec2 uv4, glm::vec3 nm)
 {
@@ -937,4 +985,139 @@ void renderQuad()
 	glBindVertexArray(quadVAO);
 	glDrawArrays(GL_TRIANGLES, 0, 6);
 	glBindVertexArray(0);
+}
+
+unsigned int bbVAO;
+unsigned int bbVBO;
+
+void draw_bbox(BoundingBox &bbox, const Shader &myshader)
+{
+	//if (mesh->vertices.size() == 0)
+	//	return;
+
+
+
+	// Cube 1x1x1, centered on origin
+	GLfloat vertices[] = {
+	  -0.5, -0.5, -0.5, 1.0,
+	   0.5, -0.5, -0.5, 1.0,
+	   0.5,  0.5, -0.5, 1.0,
+	  -0.5,  0.5, -0.5, 1.0,
+	  -0.5, -0.5,  0.5, 1.0,
+	   0.5, -0.5,  0.5, 1.0,
+	   0.5,  0.5,  0.5, 1.0,
+	  -0.5,  0.5,  0.5, 1.0,
+	};
+
+
+	//unsigned int lightVAO;
+	glGenVertexArrays(1, &bbVAO);
+	glBindVertexArray(bbVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, bbVBO);
+	// note that we update the lamp's position attribute's stride to reflect the updated buffer data
+	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glEnableVertexAttribArray(0);
+	/*
+	glGenVertexArrays(1, &bbVAO);
+	glGenBuffers(1, &bbVBO);
+	// fill buffer
+	glBindBuffer(GL_ARRAY_BUFFER, bbVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// link vertex attributes
+	glBindVertexArray(bbVAO);
+
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	//}
+
+	// render Cube
+	glBindVertexArray(bbVAO);
+	//glDrawArrays(GL_TRIANGLES, 0, 36);
+	glBindVertexArray(0);
+	*/
+	GLuint vbo_vertices;
+	glGenBuffers(1, &vbo_vertices);
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	GLushort elements[] = {
+	  0, 1, 2, 3,
+	  4, 5, 6, 7,
+	  0, 4, 1, 5, 2, 6, 3, 7
+	};
+	GLuint ibo_elements;
+	glGenBuffers(1, &ibo_elements);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_elements);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(elements), elements, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+
+	GLfloat
+		min_x, max_x,
+		min_y, max_y,
+		min_z, max_z;
+	//min_x = max_x = mesh->vertices[0].x;
+	//min_y = max_y = mesh->vertices[0].y;
+	//min_z = max_z = mesh->vertices[0].z;
+	/*for (int i = 0; i < mesh->vertices.size(); i++) {
+		if (mesh->vertices[i].x < min_x) min_x = mesh->vertices[i].x;
+		if (mesh->vertices[i].x > max_x) max_x = mesh->vertices[i].x;
+		if (mesh->vertices[i].y < min_y) min_y = mesh->vertices[i].y;
+		if (mesh->vertices[i].y > max_y) max_y = mesh->vertices[i].y;
+		if (mesh->vertices[i].z < min_z) min_z = mesh->vertices[i].z;
+		if (mesh->vertices[i].z > max_z) max_z = mesh->vertices[i].z;
+	}*/
+
+	glm::vec3 pivot = bbox.getPivot();
+	min_x = pivot.x;
+	min_y = pivot.y;
+	min_z = pivot.z;
+
+	max_x = bbox.getXExpansion();
+	max_y = bbox.getYExpansion();
+	max_z = bbox.getZExpansion();
+
+
+	glm::vec3 size = glm::vec3(max_x - min_x, max_y - min_y, max_z - min_z);
+	glm::vec3 center = glm::vec3((min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2);
+	glm::mat4 transform = glm::translate(glm::mat4(1), center) * glm::scale(glm::mat4(1), size);
+
+	/* Apply object's transformation matrix */
+	//glm::mat4 m = mesh->object2world * transform;
+	glm::mat4 model = transform;
+
+	//glUniformMatrix4fv(glm::uniform_m, 1, GL_FALSE, glm::value_ptr(m));
+	myshader.setMat4("model", model);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_vertices);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 0, 0);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo_elements);
+	glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_SHORT, 0);
+	glDrawElements(GL_LINE_LOOP, 4, GL_UNSIGNED_SHORT, (GLvoid*)(4 * sizeof(GLushort)));
+	glDrawElements(GL_LINES, 8, GL_UNSIGNED_SHORT, (GLvoid*)(8 * sizeof(GLushort)));
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+	glDisableVertexAttribArray(0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+	glDeleteBuffers(1, &vbo_vertices);
+	glDeleteBuffers(1, &ibo_elements);
 }

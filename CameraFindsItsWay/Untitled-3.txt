@@ -1,0 +1,59 @@
+vector<Triangle*> setupTriangles()
+{
+	//triangle shit
+	glm::vec3 triTemp[36]{
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, 1.0f, 1.0f),
+	glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, -1.0f),
+	glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f),
+	glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f),
+	glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, -1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f),
+	glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, -1.0f)
+	};
+
+	glm::mat4 model;
+
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(0.0f, 0.5f, 0.0));
+	model = glm::scale(model, glm::vec3(0.5f));
+	for (int i = 0; i < 12; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(2.0f, 2.0f, -5.0));
+	model = glm::scale(model, glm::vec3(0.5f));
+	for (int i = 12; i < 24; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	model = glm::mat4();
+	model = glm::translate(model, glm::vec3(-1.5f, 2.2f, -2.5f));
+	model = glm::rotate(model, glm::radians(60.0f), glm::normalize(glm::vec3(1.0, 0.0, 1.0)));
+	model = glm::scale(model, glm::vec3(0.5));
+	for (int i = 24; i < 36; i++)
+	{
+		triTemp[i] = model * glm::vec4(triTemp[i], 1);
+	}
+
+	for (int i = 0; i < 36; i++)
+	{
+		cout << "Point X: " << triTemp[i].x << " Y: " << triTemp[i].y << " Z: " << triTemp[i].z << std::endl;
+	}
+
+	std::vector<Triangle*> tris = vector<Triangle*>();
+	for (int i = 0; i < 36; i+=3)
+	{
+		tris.push_back(new Triangle(triTemp[i], triTemp[i + 1], triTemp[i + 2]));
+	}
+
+	return tris;
+}
