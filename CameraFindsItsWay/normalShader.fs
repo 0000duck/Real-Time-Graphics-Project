@@ -80,6 +80,7 @@ void main()
     //FragColor = vec4(ambient + diffuse + specular, 1.0);
 
     FragColor = vec4(lighting, 1.0);
+    //FragColor = vec4(0.1, 0.1, 1.0, 1.0);
 }
 
 // #version 330 core

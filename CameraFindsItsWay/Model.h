@@ -29,6 +29,7 @@ public:
 	{
 		loadModel(path);
 	}
+	Model() {}
 	void Draw(Shader shader);
 private:
 	vector<Mesh> meshes;

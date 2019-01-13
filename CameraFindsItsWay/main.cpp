@@ -28,6 +28,9 @@ void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, 
 
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
+const unsigned int MULTISAMPLING_2 = 2, MULTISAMPLING_4 = 4, MULTISAMPLING_8 = 8;
+
+bool game_is_running = true;
 
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
@@ -46,17 +49,86 @@ glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 glm::mat4 lightRotationMat;
 float lightRotation;
 
+const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
 // normal map
 float bumpFactor = 1.0f;
 
-int main()
+// ugly stuff
+
+glm::vec3 pathPoints[] = {
+	glm::vec3(0.0f, 0.0f, 4.0f),
+	glm::vec3(1.0f, 0.0f, 3.0f),
+	glm::vec3(1.0f, 0.0f, -0.5f),
+	glm::vec3(0.55f, -0.3f, -1),
+	glm::vec3(-0.8f, -1.3, -1.2),
+	glm::vec3(-4.0f, -2.0f, -1.65),
+	glm::vec3(-2.8f, -2.2f, -4.5),
+	glm::vec3(-0.95f, -0.7f, -4.1),
+	glm::vec3(0.2f, 1.0f, -4.0f),
+	glm::vec3(1.0f, 2.6f, -3.8f),
+	glm::vec3(2.25f, 4.8f, -4.3f),
+	glm::vec3(2.1f, 4.7f, -5.5f)
+};
+
+glm::quat quats[] = {
+	glm::angleAxis(0.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(5.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(3.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(10.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(4.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(12.0f, glm::vec3(1.0, 0.0, 0.0)),
+	glm::angleAxis(18.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(14.0f, glm::vec3(0.0, 0.0, 1.0)),
+	glm::angleAxis(10.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(2.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(6.0f, glm::vec3(0.0, 1.0, 0.0)),
+	glm::angleAxis(0.0f, glm::vec3(0.0, 1.0, 0.0))
+};
+
+// state variables
+
+GLFWwindow* window;
+unsigned int diffuseMap;
+unsigned int normalMap;
+unsigned int depthMap;
+
+float t = 1.0f;
+float dist = 0.0f;
+int currentSegment = 0;
+
+unsigned int depthMapFBO;
+
+Model carModel;
+
+Shader shadowMapShader;
+Shader debugShader;
+Shader shader;
+Shader normalShader;
+Shader modelShader;
+
+int currentSampleRate = 0;
+
+// plane stuff
+unsigned int planeVAO = 0;
+unsigned int planeVBO = 0;
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO = 0;
+
+unsigned int cubeVAO = 0;
+unsigned int cubeVBO = 0;
+
+int initWindow(int multisampling)
 {
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+	if(multisampling > 0 && multisampling <= 8)
+		glfwWindowHint(GLFW_SAMPLES, multisampling);
 
-	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "EZG", NULL, NULL);
+	window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "EZG", NULL, NULL);
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -79,55 +151,26 @@ int main()
 	glEnable(GL_MULTISAMPLE);
 	glEnable(GL_DEPTH_TEST);
 
-	//Shader lampShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.vertex", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/lamp.frag");
-	//Shader lightingShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/colors.vertex", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/colors.frag");
-	//Shader modelShader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.vs", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.fs");
+	carModel = Model("testarossa/testarossa3.obj");
 
-	Shader shadowMapShader("shadowMapping.vs", "shadowMapping.fs");
-	Shader debugShader("debugQuad.vs", "debugQuad.fs");
-	Shader shader("Shadow_Mapping_Shader.vs", "Shadow_Mapping_Shader.fs");
-	Shader normalShader("normalShader.vs", "normalShader.fs");
+	modelShader = Shader("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.vs", "C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/model.fs");
 
-	Shader modelShader("model.vs", "model.fs");
+	shadowMapShader = Shader("shadowMapping.vs", "shadowMapping.fs");
+	//Shader debugShader("debugQuad.vs", "debugQuad.fs");
+	shader = Shader("Shadow_Mapping_Shader.vs", "Shadow_Mapping_Shader.fs");
+	normalShader = Shader("normalShader.vs", "normalShader.fs");
 
-	unsigned int diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/legoImages/Blocks_001_COLOR_A.jpg");
-	unsigned int normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/normal_4.png");
+	//Shader modelShader("model.vs", "model.fs");
 
-	glm::vec3 pathPoints[] = {
-		glm::vec3(0.0f, 0.0f, 4.0f),
-		glm::vec3(1.0f, 0.0f, 3.0f),
-		glm::vec3(1.0f, 0.0f, -0.5f),
-		glm::vec3(0.55f, -0.3f, -1),
-		glm::vec3(-0.8f, -1.3, -1.2),
-		glm::vec3(-4.0f, -2.0f, -1.65),
-		glm::vec3(-2.8f, -2.2f, -4.5),
-		glm::vec3(-0.95f, -0.7f, -4.1),
-		glm::vec3(0.2f, 1.0f, -4.0f),
-		glm::vec3(1.0f, 2.6f, -3.8f),
-		glm::vec3(2.25f, 4.8f, -4.3f),
-		glm::vec3(2.1f, 4.7f, -5.5f)
-	};
+	diffuseMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/unicorn.jpg");
+	normalMap = loadTexture("C:/Users/basti/source/repos/CameraFindsItsWay/CameraFindsItsWay/normal_4.png");
 
-	glm::quat quats[] = {
-		glm::angleAxis(0.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(5.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(3.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(10.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(4.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(12.0f, glm::vec3(1.0, 0.0, 0.0)),
-		glm::angleAxis(18.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(14.0f, glm::vec3(0.0, 0.0, 1.0)),
-		glm::angleAxis(10.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(2.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(6.0f, glm::vec3(0.0, 1.0, 0.0)),
-		glm::angleAxis(0.0f, glm::vec3(0.0, 1.0, 0.0))
-	};
+	int maxSamples;
+	glGetIntegerv(GL_MAX_SAMPLES, &maxSamples);
+	cout << "Max samples: " << maxSamples << endl;
 
-	const unsigned int SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
-	unsigned int depthMapFBO;
 	glGenFramebuffers(1, &depthMapFBO);
 	// depth texture
-	unsigned int depthMap;
 	glGenTextures(1, &depthMap);
 	glBindTexture(GL_TEXTURE_2D, depthMap);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
@@ -144,13 +187,67 @@ int main()
 	glReadBuffer(GL_NONE);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	// cube
+
+	float verticesCube[504];
+
+	calculateTangents(verticesCube, 0, glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, 0.0f, -1.0f));
+	calculateTangents(verticesCube, 84, glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	calculateTangents(verticesCube, 168, glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
+	calculateTangents(verticesCube, 252, glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, 1.0f, -1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+	calculateTangents(verticesCube, 336, glm::vec3(1.0f, -1.0f, -1.0f), glm::vec3(1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, 1.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f));
+	calculateTangents(verticesCube, 420, glm::vec3(-1.0f, 1.0f, -1.0f), glm::vec3(-1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, 1.0f), glm::vec3(1.0f, 1.0f, -1.0f), glm::vec2(0.0f, 1.0f), glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 0.0f), glm::vec2(1.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+	glGenVertexArrays(1, &cubeVAO);
+	glGenBuffers(1, &cubeVBO);
+	// fill buffer
+	glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(verticesCube), verticesCube, GL_STATIC_DRAW);
+	// link vertex attributes
+	glBindVertexArray(cubeVAO);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+
+	// cubeend
+	// plane
+
+	float vertices[84];
+	calculateTangents(vertices, 0, glm::vec3(-25.0f, -0.5, -25.0f), glm::vec3(-25.0f, -0.5, 25.0f), glm::vec3(25.0f, -0.5f, 25.0f), glm::vec3(25.0f, -0.5, -25.0f), glm::vec2(0.0f, 25.0f), glm::vec2(0.0f, 0.0f), glm::vec2(25.0f, 0.0f), glm::vec2(25.0f, 25.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	glGenVertexArrays(1, &planeVAO);
+	glGenBuffers(1, &planeVBO);
+	// fill buffer
+	glBindBuffer(GL_ARRAY_BUFFER, planeVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	// link vertex attributes
+	glBindVertexArray(planeVAO);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(6 * sizeof(float)));
+	glEnableVertexAttribArray(3);
+	glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
+	glEnableVertexAttribArray(4);
+	glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+
+	// plane end
+
 	normalShader.use();
 	normalShader.setInt("diffuseMap", 0);
 	normalShader.setInt("normalMap", 1);
 	normalShader.setInt("shadowMap", 2);
-	debugShader.use();
-	debugShader.setInt("depthMap0", 0);
-	
+	//debugShader.use();
+	//debugShader.setInt("depthMap0", 0);
+
 	for (int i = 1; i < 10; i++)
 	{
 		float l = computeSplineLength(pathPoints[i - 1], pathPoints[i], pathPoints[i + 1], pathPoints[i + 2]);
@@ -158,116 +255,127 @@ int main()
 		totalLength += l;
 	}
 
-	float t = 1.0f;
-	float dist = 0.0f;
-	int currentSegment = 0;
+	return 0;
+}
 
-	//Model carModel("testarossa/testarossa3.obj");
-
-	while (!glfwWindowShouldClose(window))
+int main()
+{
+	while (game_is_running)
 	{
-		float currentFrame = glfwGetTime();
-		deltaTime = currentFrame - lastFrame;
-		lastFrame = currentFrame;
-		processInput(window);
-
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-		if (autoCamera)
+		initWindow(currentSampleRate);
+		while (!glfwWindowShouldClose(window))
 		{
-			t = dist / segmentLength[currentSegment] + 1;
-			float tOrientation = 0.5f * deltaTime;
-			if (t >= 2 && currentSegment < 10)
+			float currentFrame = glfwGetTime();
+			deltaTime = currentFrame - lastFrame;
+			lastFrame = currentFrame;
+			processInput(window);
+
+			glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+			if (autoCamera)
 			{
-				dist = 0;
-				currentSegment++;
-				std::cout << "Current segment: " << currentSegment << std::endl;
+				t = dist / segmentLength[currentSegment] + 1;
+				float tOrientation = 0.5f * deltaTime;
+				if (t >= 2 && currentSegment < 10)
+				{
+					dist = 0;
+					currentSegment++;
+					std::cout << "Current segment: " << currentSegment << std::endl;
+				}
+
+				glm::quat qSquad = Squad(
+					quats[currentSegment],
+					quats[currentSegment + 1],
+					quats[currentSegment + 2],
+					quats[currentSegment + 3],
+					t - 1);
+				glm::vec3 target = CatmullRom(t, pathPoints[currentSegment], pathPoints[currentSegment + 1], pathPoints[currentSegment + 2], pathPoints[currentSegment + 3]);
+				camera.Move(target - camera.Position, deltaTime);
+				glm::mat4 mSquad = glm::mat4_cast(qSquad);
+				//camera.Rotate(qSquad);
+				dist += camera.MovementSpeed * deltaTime;
 			}
 
-			glm::quat qSquad = Squad(
-				quats[currentSegment],
-				quats[currentSegment + 1],
-				quats[currentSegment + 2],
-				quats[currentSegment + 3],
-				t - 1);
-			glm::vec3 target = CatmullRom(t, pathPoints[currentSegment], pathPoints[currentSegment + 1], pathPoints[currentSegment + 2], pathPoints[currentSegment + 3]);
-			camera.Move(target - camera.Position, deltaTime);
-			glm::mat4 mSquad = glm::mat4_cast(qSquad);
-			//camera.Rotate(qSquad);
-			dist += camera.MovementSpeed * deltaTime;
+			glm::mat4 lightProjection, lightView;
+			glm::mat4 lightSpaceMatrix;
+			float near_plane = 1.0f, far_plane = 7.5f;
+			lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+			glm::vec3 lightPosRotated = glm::vec4(lightPos, 0) * lightRotationMat;
+			lightView = glm::lookAt(lightPosRotated, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
+			lightSpaceMatrix = lightProjection * lightView;
+
+			shadowMapShader.use();
+			shadowMapShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+
+			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, diffuseMap);
+			renderScene(shadowMapShader);
+			glm::mat4 model;
+			model = glm::translate(model, glm::vec3(0.0f, -0.5f, -0.75f));
+			shadowMapShader.setMat4("model", model);
+			carModel.Draw(shadowMapShader);
+
+
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			normalShader.use();
+
+			normalShader.setFloat("bumpFactor", bumpFactor);
+
+			//normalShader.setInt("diffuseMap", 0);
+			//normalShader.setInt("normalMap", 1);
+			//normalShader.setInt("shadowMap", 2);
+
+			glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
+			glm::mat4 view = camera.GetViewMatrix();
+			normalShader.setMat4("projection", projection);
+			normalShader.setMat4("view", view);
+
+			normalShader.setVec3("viewPos", camera.Position);
+			normalShader.setVec3("lightPos", lightPosRotated);
+			normalShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, diffuseMap);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, normalMap);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, depthMap);
+			renderScene(normalShader);
+
+			normalShader.use();
+			normalShader.setMat4("projection", projection);
+			normalShader.setMat4("view", view);
+
+			//model = glm::translate(model, glm::vec3(0.0f, -0.5f, -0.75f));
+			normalShader.setMat4("model", model);
+			carModel.Draw(normalShader);
+
+			glfwSwapBuffers(window);
+			glfwPollEvents();
 		}
+		glDeleteBuffers(1, &depthMapFBO);
+		glDeleteBuffers(1, &planeVBO);
+		glDeleteBuffers(1, &cubeVBO);
+		glDeleteVertexArrays(1, &planeVAO);
+		glDeleteVertexArrays(1, &cubeVAO);
 
-		glm::mat4 lightProjection, lightView;
-		glm::mat4 lightSpaceMatrix;
-		float near_plane = 1.0f, far_plane = 7.5f;
-		lightProjection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
-		glm::vec3 lightPosRotated = glm::vec4(lightPos, 0) * lightRotationMat;
-		lightView = glm::lookAt(lightPosRotated, glm::vec3(0.0f), glm::vec3(0.0, 1.0, 0.0));
-		lightSpaceMatrix = lightProjection * lightView;
-
-		shadowMapShader.use();
-		shadowMapShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-
-		glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
-		glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-		glClear(GL_DEPTH_BUFFER_BIT);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuseMap);
-		renderScene(shadowMapShader);
-		
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		normalShader.use();
-
-		normalShader.setFloat("bumpFactor", bumpFactor);
-
-		//normalShader.setInt("diffuseMap", 0);
-		//normalShader.setInt("normalMap", 1);
-		//normalShader.setInt("shadowMap", 2);
-
-		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-		glm::mat4 view = camera.GetViewMatrix();
-		normalShader.setMat4("projection", projection);
-		normalShader.setMat4("view", view);
-		
-		normalShader.setVec3("viewPos", camera.Position);
-		normalShader.setVec3("lightPos", lightPosRotated);
-		normalShader.setMat4("lightSpaceMatrix", lightSpaceMatrix);
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, diffuseMap);
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, normalMap);
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, depthMap);
-		renderScene(normalShader);
-
-
-		//modelShader.use();
-		//modelShader.setMat4("projection", projection);
-		//modelShader.setMat4("view", view);
-
-		glm::mat4 model;
-		model = glm::translate(model, glm::vec3(0.0f, -0.5f, 0.0f));
-		//modelShader.setMat4("model", model);
-		//carModel.Draw(modelShader);
-
-		glfwSwapBuffers(window);
-		glfwPollEvents();
+		glfwTerminate();
 	}
-
-	//glDeleteVertexArrays(1, &planeVAO);
-	//glDeleteBuffers(1, &planeVBO);
-
-	glfwTerminate();
 	return 0;
 }
 
 void processInput(GLFWwindow *window)
 {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+	{
 		glfwSetWindowShouldClose(window, true);
+		game_is_running = false;
+	}
 
 	if (glfwGetKey(window, GLFW_KEY_M) == GLFW_PRESS)
 	{
@@ -286,6 +394,34 @@ void processInput(GLFWwindow *window)
 		rotationMat = glm::rotate(rotationMat, glm::radians(lightRotation), glm::vec3(0.0f, 1.0f, 0.0f));
 		lightRotationMat = rotationMat;
 		//lightPos = glm::vec4(lightPos.x, lightPos.y, lightPos.z, 1.0) * rotationMat;
+	}
+
+	if (glfwGetKey(window, GLFW_KEY_N))
+	{
+		planeVAO = 0;
+		planeVBO = 0;
+		quadVAO = 0;
+		quadVBO = 0;
+		cubeVAO = 0;
+		cubeVBO = 0;
+
+		if (currentSampleRate == 0)
+		{
+			currentSampleRate = 2;
+		}
+		else if(currentSampleRate == 2)
+		{
+			currentSampleRate = 4;
+		}
+		else if (currentSampleRate == 4)
+		{
+			currentSampleRate = 8;
+		}
+		else if (currentSampleRate == 8)
+		{
+			currentSampleRate = 0;
+		}
+		glfwSetWindowShouldClose(window, true);
 	}
 
 	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
@@ -475,8 +611,6 @@ void renderScene(const Shader &shader)
 	//}
 }
 
-unsigned int cubeVAO = 0;
-unsigned int cubeVBO = 0;
 void renderCube()
 {
 	// initialize (if necessary)
@@ -508,6 +642,7 @@ void renderCube()
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
 		glEnableVertexAttribArray(4);
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+		cout << "cubes initialized" << endl;
 	}
 	// render Cube
 	glBindVertexArray(cubeVAO);
@@ -650,8 +785,6 @@ void calculateTangents(float vertexArray[], int stride, glm::vec3 pos1, glm::vec
 	vertexArray[stride + 83] = bitangent2.z;
 }
 
-unsigned int quadVAO = 0;
-unsigned int quadVBO;
 //void renderQuad()
 //{
 //	if (quadVAO == 0)
@@ -679,9 +812,6 @@ unsigned int quadVBO;
 //	glBindVertexArray(0);
 //}
 
-unsigned int planeVAO = 0;
-unsigned int planeVBO = 0;
-
 void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, glm::vec2 uv1, glm::vec2 uv2, glm::vec2 uv3, glm::vec2 uv4, glm::vec3 nm)
 {
 	if (planeVAO == 0)
@@ -705,6 +835,8 @@ void renderQuad(glm::vec3 pos1, glm::vec3 pos2, glm::vec3 pos3, glm::vec3 pos4, 
 		glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(8 * sizeof(float)));
 		glEnableVertexAttribArray(4);
 		glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 14 * sizeof(float), (void*)(11 * sizeof(float)));
+
+		cout << "Plane initialized with vaoID: " << planeVAO << endl;
 	}
 	// render plane
 	glBindVertexArray(planeVAO);
